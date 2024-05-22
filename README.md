@@ -1,4 +1,4 @@
-# mice_cardiogenesis_hedgehog
+# Hedgehog signaling pathway in cardiogenesis
 <ul>
  <li>Use the Jupyter notebook to generate matrix for E10.5 and E11.5 for the h5ad files. </li>
  <li>Use the shf_oft_trajectory.R script to generate the trajectory. </li>
