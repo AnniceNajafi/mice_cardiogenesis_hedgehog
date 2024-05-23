@@ -28,7 +28,7 @@ E10_5 <- Seurat::CreateSeuratObject(counts = Raw_data, meta.data = meta.data)
 #Follow the typical steps for QC
 
 #E10_5[["percent.mt"]] <- Seurat::PercentageFeatureSet(E10_5 , pattern = "^MT-")
-Seurat::VlnPlot(E10_5 , features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+Seurat::VlnPlot(E10_5 , features = c("nFeature_RNA", "nCount_RNA"), ncol = 2)
 E10_5 <- subset(E10_5, nFeature_RNA > 500)
 E10_5 <- subset(E10_5, nCount_RNA > 2000)
 
@@ -88,6 +88,8 @@ E10_5@meta.data$OP_enrichment[E10_5@meta.data$OP_enrichment <= 0.04] <- "N"
 my.df <- data.frame(x = part_before_underscore, y = part_after_underscore, OP_enrich = E10_5@meta.data$OP_enrichment,  AUC = t(getAUC(AUCell_obj)), phenotype = E10_5@meta.data$annotation)
 
   
+
+
 #We are only interested in the cells near the heart
 E10_5@meta.data$x_loc <- part_before_underscore
 E10_5@meta.data$y_loc <- part_after_underscore
@@ -97,48 +99,11 @@ E10_5@meta.data$y_loc <- part_after_underscore
 circle_center_x_loc <- mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))
 circle_center_y_loc <- mean(-as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))
 
-my.df$heart<-"N"
-my.df[my.df$phenotype=="Heart",]->my.df$heart<-"Y"
-#For demonstration purposes plot the enrichment path
-ggplot()+
-  geom_point(data = my.df, aes(x=as.numeric(x), y=-as.numeric(y), color=y_neigh, shape=heart, stroke=0.01))+
-  #scale_color_gradient(low = "#E1AFD1", high = "#B51B75")+
-  #scale_color_manual(values = c("#E1AFD1", "#AD88C6"))+
-  scale_shape_manual(values = c(19, 8))+
-  ggtitle("E10.5")+
-  labs(colour="Ptch1/Osr1")+
-  #geom_hline(yintercept =0)+
-  theme_classic()+
-  theme(
-    # Remove panel border
-    panel.border = element_blank(),
-    # Remove panel grid lines
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    # Remove panel background
-    panel.background = element_blank(),
-    #legend.position = "none",
-    plot.title = element_text(hjust = 0.5, size=20),
-    axis.text = element_blank(),
-    text = element_text(size=18))+labs(x="", y="", tag="B")+
-  geom_point(aes(x = mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"])), y = -mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))), color = "darkred", size = 2) +
-  annotate("path",
-            x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+45*cos(seq(0,2*3.14,length.out=100)),
-            y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+45*sin(seq(0,2*3.14,length.out=100)))+
-  annotate("path",
-           x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+30*cos(seq(0,2*3.14,length.out=100)),
-           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+30*sin(seq(0,2*3.14,length.out=100)))
-
 
 #Extract only regions enclosed within a radius of 30 to 45 from the center of the circle
 E10_5@meta.data$refined_OP_path<-"N"
 E10_5@meta.data[sqrt((as.numeric(E10_5@meta.data$x_loc) - circle_center_x_loc)^2 + (-as.numeric(E10_5@meta.data$y_loc) - circle_center_y_loc)^2)<45 & sqrt((as.numeric(E10_5@meta.data$x_loc) - circle_center_x_loc)^2 + (-as.numeric(E10_5@meta.data$y_loc) - circle_center_y_loc)^2)>30,]$refined_OP_path<-"Y"
 
-
-E10_5@meta.data$final_traj <- "N"
-E10_5@meta.data[(-E10_5@meta.data$y_loc> -min_locs_on_path$y_loc) & (-max_locs_on_path$y_loc > -E10_5@meta.data$y_loc) & E10_5@meta.data$refined_OP_path == "Y" ,]$final_traj <- "Y"
-E10_5@meta.data[(E10_5@meta.data$x_loc < max_locs_on_path$x_loc) & E10_5@meta.data$final_traj=="Y" & 
-                  E10_5@meta.data$y_loc> max_locs_on_path$y_loc + (-max_locs_on_path$y_loc - circle_center_y_loc - 30), ]$final_traj<-"N"
 
 
 my.df <- data.frame(x = part_before_underscore, y = part_after_underscore, OP_enrich = E10_5@meta.data$OP_enrichment, OP_path = E10_5@meta.data$refined_OP_path,  AUC = t(getAUC(AUCell_obj)), phenotype = E10_5@meta.data$annotation)
@@ -206,19 +171,136 @@ for (i in 1:nrow(E10_5@meta.data)) {
   E10_5@meta.data$avg_Y_neighbors[i] <- avg_Y
 }
 
+my.df$y_neigh <- E10_5@meta.data$avg_Y_neighbors
 
-E10_5@meta.data$final_traj<-"N"
-#E10_5@meta.data[y_neigh>0.5]->E10_5@meta.data$final_traj
-E10_5@meta.data[E10_5@meta.data$avg_Y_neighbors>0.5,]$final_traj<-"Y"
 
-my.df <- data.frame(x = part_before_underscore, y = part_after_underscore, OP_enrich = E10_5@meta.data$OP_enrichment, OP_path = E10_5@meta.data$refined_OP_path,  AUC = t(getAUC(AUCell_obj)), phenotype = E10_5@meta.data$annotation, y_neigh = E10_5@meta.data$avg_Y_neighbors, final_traj = E10_5@meta.data$final_traj)
+
+#my.df$heart<-"N"
+#my.df[my.df$phenotype=="Heart",]->my.df$heart<-"Y"
+
+#For demonstration purposes plot the enrichment path
+ggplot()+
+  geom_point(data = my.df, aes(x=as.numeric(x), y=-as.numeric(y), color=y_neigh, stroke=0.01))+
+  #scale_color_gradient(low = "#E1AFD1", high = "#B51B75")+
+  #scale_color_manual(values = c("#E1AFD1", "#AD88C6"))+
+  scale_shape_manual(values = c(19, 8))+
+  ggtitle("E10.5")+
+  labs(colour="Enriched Neighbors")+
+  #geom_hline(yintercept =0)+
+  theme_classic()+
+  theme(
+    # Remove panel border
+    panel.border = element_blank(),
+    # Remove panel grid lines
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # Remove panel background
+    panel.background = element_blank(),
+    #legend.position = "none",
+    plot.title = element_text(hjust = 0.5, size=20),
+    axis.text = element_blank(),
+    text = element_text(size=18))+labs(x="", y="", tag="A")+
+  geom_point(aes(x = mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"])), y = -mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))), color = "darkred", size = 2) +
+  annotate("path",
+           x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+45*cos(seq(0,2*3.14,length.out=100)),
+           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+45*sin(seq(0,2*3.14,length.out=100)))+
+  annotate("path",
+           x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+30*cos(seq(0,2*3.14,length.out=100)),
+           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+30*sin(seq(0,2*3.14,length.out=100)))
+
+
+
 
 
 #In this case we are inverting y coordinates so would have to take max value for min loc and vice versa
 
 min_locs_on_path <- E10_5@meta.data[E10_5@meta.data$y_loc == max(E10_5@meta.data[E10_5@meta.data$avg_Y_neighbors>0.5 & E10_5@meta.data$refined_OP_path=="Y",]$y_loc) & E10_5@meta.data$refined_OP_path == "Y" & E10_5@meta.data$final_traj == "Y",][1,]
-
 max_locs_on_path <- E10_5@meta.data[E10_5@meta.data$y_loc == min(E10_5@meta.data[E10_5@meta.data$avg_Y_neighbors>0.5 & E10_5@meta.data$refined_OP_path=="Y",]$y_loc) & E10_5@meta.data$refined_OP_path == "Y" & E10_5@meta.data$final_traj == "Y",][1,]
+
+
+
+
+E10_5@meta.data$final_traj<-"N" #Ensure it is on the trajectory
+#E10_5@meta.data[y_neigh>0.5]->E10_5@meta.data$final_traj
+E10_5@meta.data[E10_5@meta.data$avg_Y_neighbors>0.5,]$final_traj<-"Y" #Filter for neighbor enrichment
+
+E10_5@meta.data$final_traj -> my.df$final_traj
+
+
+
+ggplot()+
+  geom_point(data = my.df, aes(x=as.numeric(x), y=-as.numeric(y), color=final_traj, stroke=0.01))+
+  #scale_color_gradient(low = "#E1AFD1", high = "#B51B75")+
+  #scale_color_manual(values = c("#E1AFD1", "#AD88C6"))+
+  scale_shape_manual(values = c(19, 8))+
+  ggtitle("E10.5")+
+  labs(colour="Enriched Neighbors")+
+  #geom_hline(yintercept =0)+
+  theme_classic()+
+  theme(
+    # Remove panel border
+    panel.border = element_blank(),
+    # Remove panel grid lines
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # Remove panel background
+    panel.background = element_blank(),
+    #legend.position = "none",
+    plot.title = element_text(hjust = 0.5, size=20),
+    axis.text = element_blank(),
+    text = element_text(size=18))+labs(x="", y="", tag="A")+
+  geom_point(aes(x = mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"])), y = -mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))), color = "darkred", size = 2) +
+  annotate("path",
+           x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+45*cos(seq(0,2*3.14,length.out=100)),
+           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+45*sin(seq(0,2*3.14,length.out=100)))+
+  annotate("path",
+           x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+30*cos(seq(0,2*3.14,length.out=100)),
+           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+30*sin(seq(0,2*3.14,length.out=100)))
+
+
+
+E10_5@meta.data[(-E10_5@meta.data$y_loc> -min_locs_on_path$y_loc) & (-max_locs_on_path$y_loc > -E10_5@meta.data$y_loc) & E10_5@meta.data$refined_OP_path == "Y" ,]$final_traj <- "Y"
+E10_5@meta.data[(E10_5@meta.data$x_loc < max_locs_on_path$x_loc) & E10_5@meta.data$final_traj=="Y" & 
+                  E10_5@meta.data$y_loc> max_locs_on_path$y_loc + (-max_locs_on_path$y_loc - circle_center_y_loc - 30), ]$final_traj<-"N"
+
+E10_5@meta.data[E10_5@meta.data$refined_OP_path=="N",]$final_traj<-"N" #ensure it is within the two circles
+
+
+my.df <- data.frame(x = part_before_underscore, y = part_after_underscore, OP_enrich = E10_5@meta.data$OP_enrichment, OP_path = E10_5@meta.data$refined_OP_path,  AUC = t(getAUC(AUCell_obj)), phenotype = E10_5@meta.data$annotation, y_neigh = E10_5@meta.data$avg_Y_neighbors, final_traj = E10_5@meta.data$final_traj)
+
+
+ggplot()+
+  geom_point(data = my.df, aes(x=as.numeric(x), y=-as.numeric(y), color=final_traj, stroke=0.01))+
+  #scale_color_gradient(low = "#E1AFD1", high = "#B51B75")+
+  #scale_color_manual(values = c("#E1AFD1", "#AD88C6"))+
+  scale_shape_manual(values = c(19, 8))+
+  ggtitle("E10.5")+
+  labs(colour="Enriched Neighbors")+
+  #geom_hline(yintercept =0)+
+  theme_classic()+
+  theme(
+    # Remove panel border
+    panel.border = element_blank(),
+    # Remove panel grid lines
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # Remove panel background
+    panel.background = element_blank(),
+    #legend.position = "none",
+    plot.title = element_text(hjust = 0.5, size=20),
+    axis.text = element_blank(),
+    text = element_text(size=18))+labs(x="", y="", tag="A")+
+  geom_point(aes(x = mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"])), y = -mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))), color = "darkred", size = 2) +
+  geom_point(aes(x= min_locs_on_path$x_loc, y=-min_locs_on_path$y_loc), color="yellow")+
+  geom_point(aes(x= max_locs_on_path$x_loc, y=-max_locs_on_path$y_loc), color="yellow")+
+  annotate("path",
+           x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+45*cos(seq(0,2*3.14,length.out=100)),
+           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+45*sin(seq(0,2*3.14,length.out=100)))+
+  annotate("path",
+           x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+30*cos(seq(0,2*3.14,length.out=100)),
+           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+30*sin(seq(0,2*3.14,length.out=100)))
+
+
 
 
 #Center and radii of the circles
@@ -232,9 +314,10 @@ outer_radius <- 45
 
 marker_expression_SHF_OFT_traj<- function(sliding_window_size = 20, center_x, center_y, inner_radius, outer_radius, biomarker){
   
-  starting_angle <- - acos(((min_locs_on_path$y_loc+center_y)/outer_radius)) # starting SHF
+  starting_angle <- - acos(((min_locs_on_path$x_loc-center_x)/inner_radius)) # starting SHF
   
-  ending_angle <- acos((max_locs_on_path$x_loc-center_x)/inner_radius) #ending OFT
+  #ending_angle <- asin(-(max_locs_on_path$y_loc+center_y)/outer_radius) #ending OFT
+  ending_angle <- acos((max_locs_on_path$x_loc-center_x)/inner_radius)
   
   sliding_x <- c()
   sliding_y <- c()
@@ -275,13 +358,16 @@ marker_expression_SHF_OFT_traj<- function(sliding_window_size = 20, center_x, ce
     
   }
   
-  return(sliding_ligand.df)
+  return(list(sliding_ligand.df, windows))
 }
 
 
 
+sliding_ligand.df <- marker_expression_SHF_OFT_traj(sliding_window_size = 20, center_x, center_y, inner_radius, outer_radius, "Ptch1")
 
-
+sliding_ligand.df[[2]]->windows
+colnames(windows)<-c("sliding_x", "sliding_y")
+sliding_ligand.df[[1]]->sliding_ligand.df
 
 ggplot()+
   geom_point(data=my.df, aes(x=as.numeric(x), y=-as.numeric(y), color=final_traj))+
@@ -310,18 +396,16 @@ ggplot()+
     plot.title = element_text(hjust = 0.5, size=20),
     axis.text = element_blank(),
     text = element_text(size=18))+labs(x="", y="", tag="B")+
-  geom_point(aes(x = mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"])), y = -mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))), color = "#5D0E41", size = 2) +
+  geom_point(aes(x= min_locs_on_path$x_loc, y=-min_locs_on_path$y_loc), color="yellow")+
+  #geom_point(aes(x= max_locs_on_path$x_loc, y=-max_locs_on_path$y_loc), color="yellow")+
+  #geom_point(aes(x = mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"])), y = -mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))), color = "#5D0E41", size = 2) +
   geom_point(data = windows, aes(x= sliding_x, y=sliding_y), color="#A0153E", stroke=6)+
   annotate("path",
            x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+45*cos(seq(0,2*3.14,length.out=100)),
            y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+45*sin(seq(0,2*3.14,length.out=100)))+
   annotate("path",
            x=mean(as.numeric(E10_5@meta.data$x_loc[E10_5@meta.data$annotation == "Heart"]))+30*cos(seq(0,2*3.14,length.out=100)),
-           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+30*sin(seq(0,2*3.14,length.out=100))) -> plt.heart.vicinity
-
-
-sliding_ligand.df <- marker_expression_SHF_OFT_traj(sliding_window_size = 30, center_x, center_y, inner_radius, outer_radius, "Ptch1")
-
+           y=-mean(as.numeric(E10_5@meta.data$y_loc[E10_5@meta.data$annotation == "Heart"]))+30*sin(seq(0,2*3.14,length.out=100))) 
 
 
 
@@ -355,7 +439,7 @@ ggplot(summary_df, aes(x = as.numeric(source), y = mean_ligand, group = 1)) +
     panel.background = element_blank(),
     #legend.position = "none",
     plot.title = element_text(hjust = 0.5, size=20),
-    axis.text = element_blank(),
+    #axis.text = element_blank(),
     text = element_text(size=18))+labs(x="Location from SHF-OFT", y="Ptch1", tag="C")->plt.marker.C
 
 
